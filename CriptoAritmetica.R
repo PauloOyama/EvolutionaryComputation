@@ -12,8 +12,12 @@ generation_interactions <- 50
 letters <- c('SEND','MORE','MONEY')
 #Set of characters sorted
 words_sorted = paste(sort(unlist(strsplit(words, ""))), collapse = "")
+#Mutation Rate
+MT <- 1 #10%
 #Set seed
 set.seed(12)
+
+
 
 #Generating Random Population
 generate_random_population <- function(size){
@@ -44,18 +48,18 @@ fitness <- function(individual){
 }
 
 #Mutation - Swaping two index 
-random_mutation <- function(individual_index,mutation_rate){
+random_mutation <- function(individual,mutation_rate){
     if(sample(seq(1:10),1) <= mutation_rate){
       index_to_swap = sample(seq(1,8,1),2)
-      flag <- population[[individual_index]][index_to_swap[1]]
-      population[[individual_index]][index_to_swap[1]] <- population[[individual_index]][index_to_swap[2]]
-      population[[individual_index]][index_to_swap[2]] <- flag
+      flag <- individual[index_to_swap[1]]
+      individual[index_to_swap[1]] <- individual[index_to_swap[2]]
+      individual[index_to_swap[2]] <- flag
     }
-      return (population[[individual_index]])
+      return (individual)
 }
 
 
-# Check diff between set A and set B
+# Check diff between set A and set B and return theirs index
 find_diff <- function(individual_a,individual_b){
   repeated <- c()
   for(x in individual_b){
@@ -96,7 +100,7 @@ find_cycle <- function(individual_a,individual_b){
 #Croossover Cycling - Will return two children between index a and b
 cyclic_crossover <- function(a,b){
   #Crossover Rate - 60%
-  if(sample(seq(1:10),1) <= 6){
+  if(sample(seq(1:10),1) <= 3){
     individual_a <- a
     individual_b <- b
     cycle <- find_cycle(individual_a,individual_b)
@@ -116,7 +120,9 @@ tournament_with_three <- function(population){
   return (candidates[which.max(candidates_fitness)])
 }
 
+#Roulette will return an index of the candidate
 roulette <- function(){
+  fitness_pop <- unlist(lapply(population,fitness))
   fitness_pop <- unlist(lapply(fitness_pop, function(x) x + abs(fitness_pop[which.min(fitness_pop)])))
   roulette <- sum(fitness_pop)
   probability <- fitness_pop/roulette
@@ -132,12 +138,8 @@ repeated_position <- function (a,b,indexes_slice){
   suffix <- a[indexes_slice[2]:8]
   
   repetead_indexes = c()
-  print(unlist(list(prefix,suffix)))
-  print(slice_b)
-  print(slice_a)
   for( x in unlist(list(prefix,suffix))){
     if(x %in% slice_b){
-      print(x)
       repetead_indexes =  append(repetead_indexes,match(x,a))
     } 
     
@@ -145,47 +147,90 @@ repeated_position <- function (a,b,indexes_slice){
   return (repetead_indexes)
 }
 
+a <- c(8, 2, 3, 9, 0, 6, 1, 7)
+b <- c(3, 4, 8, 9, 1, 0, 5, 2)
 
+#Pai 1= 3 2 6 7 0 1 8 5  Pai 2=  7 1 4 8 6 5 9 0 
+#SLICE =  2 8 
 pmx <- function(a,b){
-  #indexes_slice <- sort(sample(seq(1,8,1),2))
-  indexes_slice <- c(3,6)
-  parent_one = a
-  parent_two = b
-  swap_parent_one <- repeated_position(parent_one,parent_two,indexes_slice)
-  swap_parent_two <- repeated_position(parent_two,parent_one,indexes_slice)
-  
-  for(i in seq(indexes_slice[1],indexes_slice[2]-1,1)){
-    flag = parent_one[i]
-    parent_one[i] = parent_two[i]
-    parent_two[i] = flag
-  }
-  
-  for(i in seq(1,length(swap_parent_one),1)){
-    print(i)
-    flag = parent_one[swap_parent_one[i]]
-    parent_one[swap_parent_one[i]] = parent_two[swap_parent_two[i]]
-    parent_two[swap_parent_two[i]] = flag
+  parent_one <- a
+  parent_two <- b
+  if(sample(seq(1,10),1) <= 3){
+    cat('Pai 1=', a, ' Pai 2= ',b,'\n')
+    indexes_slice <- sort(sample(seq(1,8,1),2))
+    #indexes_slice <- c(5,7)
+    cat('SLICE = ', indexes_slice,'\n')
+    swap_parent_one <- repeated_position(parent_one,parent_two,indexes_slice)
+    swap_parent_two <- repeated_position(parent_two,parent_one,indexes_slice)
+    
+    if(is.null(swap_parent_one)) swap_parent_one <-  find_diff(b,a)
+    if(is.null(swap_parent_two)) swap_parent_two <-  find_diff(a,b)
+    
+    for(i in seq(indexes_slice[1],indexes_slice[2]-1,1)){
+      flag = parent_one[i]
+      parent_one[i] <- parent_two[i]
+      parent_two[i] <- flag
+    }
+    
+    for(i in seq(1,length(swap_parent_one))){
+      flag <- parent_one[swap_parent_one[i]]
+      parent_one[swap_parent_one[i]] <- parent_two[swap_parent_two[i]]
+      parent_two[swap_parent_two[i]] <- flag
+    }
   }
   return (list(parent_one,parent_two))
 }
 
 #Step 1 Generate Initial Population
-population <- generate_random_population()
+population <- generate_random_population(100)
 
 #Step 2  - Avaliate Individual Performance
 fitness_population <- unlist(lapply(population,fitness))
 
-best_individual_fitness <- 6
-for( x in seq(1,generation_interactions,1)){
+best_individual_fitness <- 1
+best_individual <- rep(0,8)
+for( h in seq(1,generation_interactions,1)){
 
   #Step 3 - Stop 
   if(best_individual_fitness > 5) break
   
-  #step 4 - Select parents
-  parents = c(tournament_with_three(),tournament_with_three())
+  childrens <- c()
+  for( x in seq(1,population_size,1)){
+    #step 4 - Select parents
+    #Tournement
+    #parents = c(tournament_with_three(),tournament_with_three())
+    #Roulete
+    parents = c(tournament_with_three(),tournament_with_three())
+    
+    #Step 5 - CrossOver
+    #Cyclic
+    #children <- cyclic_crossover(population[[parents[1]]],population[[parents[2]]])
+    #PMX
+    children <- pmx(population[[parents[1]]],population[[parents[2]]])
+    
+    #Step 6 - Mutation
+    children[[1]] = random_mutation(children[[1]],MT)
+    children[[2]] = random_mutation(children[[2]],MT)
+    
+    childrens <- append(childrens,children)
+  }
+
+  all_population <- append(population,childrens)
   
-  cyclic_crossover(parents[1],parents[2])
-  print(x)
+  #Step 7 - Fitness All
+  all_fitness <- unlist(lapply(all_population,fitness))
+  
+  #Step 8 - 
+  best_fitness <- order(all_fitness,decreasing = TRUE)[1:100]
+  all_fitness[best_fitness]
+  population <- all_population[sample(best_fitness)]
+  
+  cat('Generation = ',h , ' With Fitness =', all_fitness[ best_fitness[1]],' Mean= ',mean(all_fitness[best_fitness]),' Sd= ',sd(all_fitness[best_fitness]),'\n')
+  if (sum(best_individual == all_population[[best_fitness[1]]]) != 8){
+    best_individual <- all_population[[best_fitness[1]]]
+  }else{
+    best_individual_fitness = best_individual_fitness + 1
+  }
 }
 
 #Parent 1 == 
@@ -194,10 +239,11 @@ for( x in seq(1,generation_interactions,1)){
 #population[[2]] <- c(1,8,3,9,0,7,4,2)
 #initial_index = 3
 
+#cyclic_crossover(parents[1],parents[2])
+#parents[1]
+#population[[1]] <- c(7,5,1,4,3,6,8,2)
+#population[[2]] <- c(3,4,8,7,5,2,6,1)
+#pmx(population[[1]],population[[2]])
+#cyclic_crossover()
 
-population[[1]] <- c(7,5,1,4,3,6,8,2)
-population[[2]] <- c(3,4,8,7,5,2,6,1)
-pmx(population[[1]],population[[2]])
-cyclic_crossover()
-
-population_fitness <- c()
+#population_fitness <- c()
