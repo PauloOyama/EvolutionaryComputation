@@ -327,5 +327,3 @@ for( h in seq(1,generation_interactions,1)){
   
   cat('BEST =',best_individual,'\n')
 }
-
-
