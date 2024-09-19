@@ -10,7 +10,6 @@ set.seed(12)
 # ------------------------#
 #       POPULATION        #
 # ------------------------#
-
 #Generating Random Population
 generate_random_population <- function(size){
   population <- list()
@@ -24,7 +23,6 @@ generate_random_population <- function(size){
 # ------------------------#
 #       FITNESS           #
 # ------------------------#
-
 #Fitness Function f(["SEND + "MORE] - "MONEY")
 fitness <- function(individual){
   parcial_fitness <- c() 
@@ -45,7 +43,6 @@ fitness <- function(individual){
 # ------------------------#
 #       MUTATION          #
 # ------------------------#
-
 #Mutation - Swaping two index 
 random_mutation <- function(individual,mutation_rate){
     if(sample(seq(1:10),1) <= mutation_rate){
@@ -60,7 +57,6 @@ random_mutation <- function(individual,mutation_rate){
 # ----------------------------------#
 #       CROSSOVER - CYCLIC          #
 # ----------------------------------#
-
 # Check diff between set A and set B and return theirs index
 find_diff <- function(individual_a,individual_b){
   repeated <- c()
@@ -118,7 +114,6 @@ cyclic_crossover <- function(a,b,TX_CROSS){
 # ----------------------------------#
 #       CROSSOVER - PMX             #
 # ----------------------------------#
-
 #Clean Cycles in OffSpring
 repared_offsprint <- function (a,indexes_slice,mapping_swap){
   
@@ -206,6 +201,32 @@ roulette <- function(population){
   return (sample(seq(1,length(population),1),1,prob = probability))
 }
 
+# ----------------------------------#
+#       REINSERTION - ORDER         #
+# ----------------------------------#
+#Take Parents and Childrens Together and take the bests
+ordened_reinsertion <- function(population, childrens,population_size){
+  all_population <- append(population,childrens)
+  all_fitness <- unlist(lapply(all_population,fitness))
+  best_fitness <- order(all_fitness,decreasing = TRUE)[1:population_size]
+  return (all_population[sample(best_fitness)])
+}
+
+# ----------------------------------#
+#       REINSERTION - ELITISMO      #
+# ----------------------------------#
+#Take the [TX_Elitism] (%)  better parents and the [1 - TX_Elitism] better childrens
+elitism_reinsertion <- function(population, childrens,TX_Elitism){
+  parents_fitness <- unlist(lapply(population,fitness))
+  best_parents <- order(parents_fitness,decreasing = TRUE)[1:(population_size*TX_Elitism)]
+  new_parents <- population[sample(best_parents)]
+  
+  complement_TX <- 1 - TX_Elitism
+  childrens_fitness <- unlist(lapply(childrens,fitness))
+  best_childrens <- order(childrens_fitness,decreasing = TRUE)[1:(population_size*complement_TX)]
+  new_childrens <- childrens[sample(best_childrens)]
+  return (c(new_parents,new_childrens))
+}
 
 # -------------------------------------------------------------------------#
 #                               MAIN                                       #
@@ -277,28 +298,34 @@ for( h in seq(1,generation_interactions,1)){
     childrens <- append(childrens,children)
   }
 
-  all_population <- append(population,childrens)
   
-  #Step 7 - Fitness All
-  all_fitness <- unlist(lapply(all_population,fitness))
+  #Step 7 - Fitness Children
+  childrens_fitness <- unlist(lapply(childrens, fitness))
   
-  #Step 8 - 
-  best_fitness <- order(all_fitness,decreasing = TRUE)[1:100]
-  all_fitness[best_fitness]
-  population <- all_population[sample(best_fitness)]
+  #Step 8 - Reinsertion
+  #population <- ordened_reinsertion(population,childrens,population_size)
+  population <- elitism_reinsertion(population,childrens,0.2)
   
+  #METRICS - Save Metrics
+  new_fitness <- unlist(lapply(population,fitness))
+  index_better <- which.max(new_fitness)
+  best_individual_fitness <- new_fitness[index_better]
+  best_individual_SD  <- sd(new_fitness)
+  best_individual_MEAN <- mean(new_fitness)
   
-  best_individual_fitness <- all_fitness[best_fitness[1]]
-  best_individual_SD  <- sd(all_fitness[best_fitness])
-  best_individual_MEAN <- mean(all_fitness[best_fitness])
-  cat('Generation =',h , ' With Fitness =', all_fitness[best_fitness[1]])
-  cat(' Mean=',mean(all_fitness[best_fitness]),' Sd=',sd(all_fitness[best_fitness]),'\n')
-  cat('BEST =',best_individual,'\n')
-  if (sum(best_individual == all_population[[best_fitness[1]]]) != 8){
-    best_individual <- all_population[[best_fitness[1]]]
+  #Basic logs
+  cat('Generation =',h , ' With Fitness =', best_individual_fitness)
+  cat(' Mean=',best_individual_MEAN,' Sd=',best_individual_SD,'\n')
+
+  
+  #Stop Condition By Individual Performance
+  if (sum(best_individual == population[[index_better]]) != 8){
+    best_individual <- population[[index_better]]
   }else{
     best_individual_count = best_individual_count + 1
   }
+  
+  cat('BEST =',best_individual,'\n')
 }
 
 
