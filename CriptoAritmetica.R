@@ -115,7 +115,11 @@ cyclic_crossover <- function(a,b,TX_CROSS){
   }
 }
 
+# ----------------------------------#
+#       CROSSOVER - PMX             #
+# ----------------------------------#
 
+#Clean Cycles in OffSpring
 repared_offsprint <- function (a,indexes_slice,mapping_swap){
   
   parent <- a
@@ -138,6 +142,7 @@ repared_offsprint <- function (a,indexes_slice,mapping_swap){
   return (list(preffix,suffix))
 }
 
+#Map OffSpring to be used in individual
 map_offspring <- function(slice_a,slice_b){
   checkers <- c()
   for(x in slice_a){
@@ -161,7 +166,7 @@ pmx <- function(a,b,TX_CROSS){
   parent_one <- a
   parent_two <- b
   if(sample(seq(1,10),1) <= TX_CROSS){
-    indexes_slice <- sort(sample(seq(1,8,1),2))
+    indexes_slice <- sort(sample(seq(1,length(parent_one),1),2))
     
     slice_a = a[indexes_slice[1]:(indexes_slice[2]-1)]
     slice_b = b[indexes_slice[1]:(indexes_slice[2]-1)]
@@ -193,13 +198,42 @@ tournament_with_three <- function(population_size){
 #       PARENTS  - ROULETTE         #
 # ----------------------------------#
 #Roulette will return an index of the candidate
-roulette <- function(){
+roulette <- function(population){
   fitness_pop <- unlist(lapply(population,fitness))
   fitness_pop <- unlist(lapply(fitness_pop, function(x) x + abs(fitness_pop[which.min(fitness_pop)])))
   roulette <- sum(fitness_pop)
   probability <- fitness_pop/roulette
-  return (sample(seq(1,population_size,1),1,prob = probability))
+  return (sample(seq(1,length(population),1),1,prob = probability))
 }
+
+
+# -------------------------------------------------------------------------#
+#                               MAIN                                       #
+# -------------------------------------------------------------------------#
+
+# ----------------------------------#
+#           PARAMENTERS             #
+# ----------------------------------#
+#Set of the characters of the words without repetition 
+words <- 'SENDMORY'
+#Length of the chromosomes
+individual_size <- nchar(words)
+#Population size 
+population_size <- 50
+#Number of generations
+generation_interactions <- 50
+#Words of the problems
+letters <- c('SEND','MORE','MONEY')
+#Set of characters sorted
+words_sorted = paste(sort(unlist(strsplit(words, ""))), collapse = "")
+#Mutation Rate
+MT <- 1 #10%
+#CrossOver Rate
+TX_CROSS <- 6 #60%
+
+# ----------------------------------#
+#         Genetic Algorithm         #
+# ----------------------------------#
 
 #Step 1 Generate Initial Population
 population <- generate_random_population(population_size)
@@ -214,17 +248,17 @@ best_individual_MEAN <- 0
 best_individual <- rep(0,8)
 for( h in seq(1,generation_interactions,1)){
 
-  #Step 3 - Stop 
+  #Step 3 - Stop Condition
   if(best_individual_count > 5) break
   if(best_individual_fitness == 30 && best_individual_MEAN == 30 && best_individual_SD == 0) break
   
   childrens <- c()
   for( x in seq(1,population_size,1)){
-    #step 4 - Select parents
+    #step 4 - Select parents 
     #Tournement
-    #parents = c(tournament_with_three(),tournament_with_three())
+    #parents = c(tournament_with_three(population_size),tournament_with_three(population_size))
     #Roulete
-    parents = c(tournament_with_three(population_size),tournament_with_three(population_size))
+    parents = c(roulette(population),roulette(population))
     
     #Step 5 - CrossOver
     #Cyclic
@@ -235,6 +269,7 @@ for( h in seq(1,generation_interactions,1)){
     if(is.null(children)){
       next
     }
+    
     #Step 6 - Mutation
     children[[1]] = random_mutation(children[[1]],MT)
     children[[2]] = random_mutation(children[[2]],MT)
