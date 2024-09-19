@@ -1,23 +1,15 @@
 install.packages('dplyr')
 library('dplyr')
-#Set of the characters of the words without repetition 
-words <- 'SENDMORY'
-#Length of the chromosomes
-individual_size <- nchar(words)
-#Population size 
-population_size <- 100
-#Number of generations
-generation_interactions <- 50
-#Words of the problems
-letters <- c('SEND','MORE','MONEY')
-#Set of characters sorted
-words_sorted = paste(sort(unlist(strsplit(words, ""))), collapse = "")
-#Mutation Rate
-MT <- 1 #10%
 #Set seed
 set.seed(12)
 
+# -------------------------------------------------------------------------#
+#                               FUNCTIONS                                  #
+# -------------------------------------------------------------------------#
 
+# ------------------------#
+#       POPULATION        #
+# ------------------------#
 
 #Generating Random Population
 generate_random_population <- function(size){
@@ -29,6 +21,9 @@ generate_random_population <- function(size){
   return (population)
 }
 
+# ------------------------#
+#       FITNESS           #
+# ------------------------#
 
 #Fitness Function f(["SEND + "MORE] - "MONEY")
 fitness <- function(individual){
@@ -47,6 +42,10 @@ fitness <- function(individual){
   return ( parcial_fitness[1] + parcial_fitness[2] - parcial_fitness[3] )
 }
 
+# ------------------------#
+#       MUTATION          #
+# ------------------------#
+
 #Mutation - Swaping two index 
 random_mutation <- function(individual,mutation_rate){
     if(sample(seq(1:10),1) <= mutation_rate){
@@ -58,6 +57,9 @@ random_mutation <- function(individual,mutation_rate){
       return (individual)
 }
 
+# ----------------------------------#
+#       CROSSOVER - CYCLIC          #
+# ----------------------------------#
 
 # Check diff between set A and set B and return theirs index
 find_diff <- function(individual_a,individual_b){
@@ -98,9 +100,9 @@ find_cycle <- function(individual_a,individual_b){
 }
 
 #Croossover Cycling - Will return two children between index a and b
-cyclic_crossover <- function(a,b){
+cyclic_crossover <- function(a,b,TX_CROSS){
   #Crossover Rate - 60%
-  if(sample(seq(1:10),1) <= 3){
+  if(sample(seq(1:10),1) <= TX_CROSS){
     individual_a <- a
     individual_b <- b
     cycle <- find_cycle(individual_a,individual_b)
@@ -113,13 +115,83 @@ cyclic_crossover <- function(a,b){
   }
 }
 
+
+repared_offsprint <- function (a,indexes_slice,mapping_swap){
+  
+  parent <- a
+  preffix <- a[1:indexes_slice[1]-1]
+  suffix  <- a[(indexes_slice[2]):length(a)] 
+  for(x in preffix){
+    if(x %in% mapping_swap[[1]]){
+      index <- match(x,mapping_swap[[1]])
+      preffix[match(x,preffix)] <- mapping_swap[[2]][index] 
+    }
+  }
+  
+  for(x in suffix){
+    if(x %in% mapping_swap[[1]]){
+      index <- match(x,mapping_swap[[1]])
+      suffix[match(x,suffix)] <- mapping_swap[[2]][index] 
+    }
+  }
+  
+  return (list(preffix,suffix))
+}
+
+map_offspring <- function(slice_a,slice_b){
+  checkers <- c()
+  for(x in slice_a){
+    if(x %in% slice_b){
+      checkers <- append(checkers,x)
+    }
+  }
+  
+  for( i in checkers){
+    index_a <- match(i,slice_a)
+    index_b <- match(i,slice_b)
+    slice_a[index_a] <- slice_a[index_b]
+    slice_a <- slice_a[-index_b]
+    slice_b <- slice_b[-index_b]
+  }
+  
+  return (list(c(slice_a,slice_b),c(slice_b,slice_a)))
+}
+
+pmx <- function(a,b,TX_CROSS){
+  parent_one <- a
+  parent_two <- b
+  if(sample(seq(1,10),1) <= TX_CROSS){
+    indexes_slice <- sort(sample(seq(1,8,1),2))
+    
+    slice_a = a[indexes_slice[1]:(indexes_slice[2]-1)]
+    slice_b = b[indexes_slice[1]:(indexes_slice[2]-1)]
+    
+    mapping_swap <- map_offspring(slice_a,slice_b)
+    
+    parts_parent_one <- repared_offsprint(parent_one,indexes_slice, mapping_swap)
+    parts_parent_two <- repared_offsprint(parent_two,indexes_slice, mapping_swap)
+    
+    parent_one <- c(parts_parent_one[[1]],slice_b,parts_parent_one[[2]])
+    parent_two <- c(parts_parent_two[[1]],slice_a,parts_parent_two[[2]])
+    return (list(parent_one,parent_two))
+  }
+}
+
+
+
+# ----------------------------------#
+#       PARENTS  - TOURNMENT        #
+# ----------------------------------#
 # Tournament will return the index of the best candidate
-tournament_with_three <- function(population){
+tournament_with_three <- function(population_size){
   candidates <- sample(seq(1,population_size,1),3)
   candidates_fitness <- fitness_pop[candidates]
   return (candidates[which.max(candidates_fitness)])
 }
 
+# ----------------------------------#
+#       PARENTS  - ROULETTE         #
+# ----------------------------------#
 #Roulette will return an index of the candidate
 roulette <- function(){
   fitness_pop <- unlist(lapply(population,fitness))
@@ -129,70 +201,22 @@ roulette <- function(){
   return (sample(seq(1,population_size,1),1,prob = probability))
 }
 
-repeated_position <- function (a,b,indexes_slice){
-  
-  slice_a = a[indexes_slice[1]:(indexes_slice[2]-1)]
-  slice_b = b[indexes_slice[1]:(indexes_slice[2]-1)]
-  
-  prefix <- a[1:(indexes_slice[1]-1)]
-  suffix <- a[indexes_slice[2]:8]
-  
-  repetead_indexes = c()
-  for( x in unlist(list(prefix,suffix))){
-    if(x %in% slice_b){
-      repetead_indexes =  append(repetead_indexes,match(x,a))
-    } 
-    
-  }
-  return (repetead_indexes)
-}
-
-a <- c(8, 2, 3, 9, 0, 6, 1, 7)
-b <- c(3, 4, 8, 9, 1, 0, 5, 2)
-
-#Pai 1= 3 2 6 7 0 1 8 5  Pai 2=  7 1 4 8 6 5 9 0 
-#SLICE =  2 8 
-pmx <- function(a,b){
-  parent_one <- a
-  parent_two <- b
-  if(sample(seq(1,10),1) <= 3){
-    cat('Pai 1=', a, ' Pai 2= ',b,'\n')
-    indexes_slice <- sort(sample(seq(1,8,1),2))
-    #indexes_slice <- c(5,7)
-    cat('SLICE = ', indexes_slice,'\n')
-    swap_parent_one <- repeated_position(parent_one,parent_two,indexes_slice)
-    swap_parent_two <- repeated_position(parent_two,parent_one,indexes_slice)
-    
-    if(is.null(swap_parent_one)) swap_parent_one <-  find_diff(b,a)
-    if(is.null(swap_parent_two)) swap_parent_two <-  find_diff(a,b)
-    
-    for(i in seq(indexes_slice[1],indexes_slice[2]-1,1)){
-      flag = parent_one[i]
-      parent_one[i] <- parent_two[i]
-      parent_two[i] <- flag
-    }
-    
-    for(i in seq(1,length(swap_parent_one))){
-      flag <- parent_one[swap_parent_one[i]]
-      parent_one[swap_parent_one[i]] <- parent_two[swap_parent_two[i]]
-      parent_two[swap_parent_two[i]] <- flag
-    }
-  }
-  return (list(parent_one,parent_two))
-}
-
 #Step 1 Generate Initial Population
-population <- generate_random_population(100)
+population <- generate_random_population(population_size)
 
 #Step 2  - Avaliate Individual Performance
 fitness_population <- unlist(lapply(population,fitness))
 
-best_individual_fitness <- 1
+best_individual_count <- 0
+best_individual_fitness <- 0
+best_individual_SD <- 0
+best_individual_MEAN <- 0
 best_individual <- rep(0,8)
 for( h in seq(1,generation_interactions,1)){
 
   #Step 3 - Stop 
-  if(best_individual_fitness > 5) break
+  if(best_individual_count > 5) break
+  if(best_individual_fitness == 30 && best_individual_MEAN == 30 && best_individual_SD == 0) break
   
   childrens <- c()
   for( x in seq(1,population_size,1)){
@@ -200,14 +224,17 @@ for( h in seq(1,generation_interactions,1)){
     #Tournement
     #parents = c(tournament_with_three(),tournament_with_three())
     #Roulete
-    parents = c(tournament_with_three(),tournament_with_three())
+    parents = c(tournament_with_three(population_size),tournament_with_three(population_size))
     
     #Step 5 - CrossOver
     #Cyclic
-    #children <- cyclic_crossover(population[[parents[1]]],population[[parents[2]]])
+    children <- cyclic_crossover(population[[parents[1]]],population[[parents[2]]],TX_CROSS)
     #PMX
-    children <- pmx(population[[parents[1]]],population[[parents[2]]])
-    
+    #children <- pmx(population[[parents[1]]],population[[parents[2]]],TX_CROSS)
+    #Doens't have childrens
+    if(is.null(children)){
+      next
+    }
     #Step 6 - Mutation
     children[[1]] = random_mutation(children[[1]],MT)
     children[[2]] = random_mutation(children[[2]],MT)
@@ -225,25 +252,18 @@ for( h in seq(1,generation_interactions,1)){
   all_fitness[best_fitness]
   population <- all_population[sample(best_fitness)]
   
-  cat('Generation = ',h , ' With Fitness =', all_fitness[ best_fitness[1]],' Mean= ',mean(all_fitness[best_fitness]),' Sd= ',sd(all_fitness[best_fitness]),'\n')
+  
+  best_individual_fitness <- all_fitness[best_fitness[1]]
+  best_individual_SD  <- sd(all_fitness[best_fitness])
+  best_individual_MEAN <- mean(all_fitness[best_fitness])
+  cat('Generation =',h , ' With Fitness =', all_fitness[best_fitness[1]])
+  cat(' Mean=',mean(all_fitness[best_fitness]),' Sd=',sd(all_fitness[best_fitness]),'\n')
+  cat('BEST =',best_individual,'\n')
   if (sum(best_individual == all_population[[best_fitness[1]]]) != 8){
     best_individual <- all_population[[best_fitness[1]]]
   }else{
-    best_individual_fitness = best_individual_fitness + 1
+    best_individual_count = best_individual_count + 1
   }
 }
 
-#Parent 1 == 
-#population[[1]] <- c(3,2,4,0,7,5,8,6)
-#Parent 2 == 
-#population[[2]] <- c(1,8,3,9,0,7,4,2)
-#initial_index = 3
 
-#cyclic_crossover(parents[1],parents[2])
-#parents[1]
-#population[[1]] <- c(7,5,1,4,3,6,8,2)
-#population[[2]] <- c(3,4,8,7,5,2,6,1)
-#pmx(population[[1]],population[[2]])
-#cyclic_crossover()
-
-#population_fitness <- c()
