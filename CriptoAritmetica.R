@@ -37,7 +37,7 @@ fitness <- function(individual){
     parcial_fitness[j] <- soma
     j <- j +1
   }
-  return ( parcial_fitness[1] + parcial_fitness[2] - parcial_fitness[3] )
+  return (abs( parcial_fitness[1] + parcial_fitness[2] - parcial_fitness[3] ))
 }
 
 # ------------------------#
@@ -46,7 +46,7 @@ fitness <- function(individual){
 #Mutation - Swaping two index 
 random_mutation <- function(individual,mutation_rate){
     if(sample(seq(1:10),1) <= mutation_rate){
-      index_to_swap = sample(seq(1,8,1),2)
+      index_to_swap = sample(seq(1,individual_size,1),2)
       flag <- individual[index_to_swap[1]]
       individual[index_to_swap[1]] <- individual[index_to_swap[2]]
       individual[index_to_swap[2]] <- flag
@@ -183,10 +183,10 @@ pmx <- function(a,b,TX_CROSS){
 #       PARENTS  - TOURNMENT        #
 # ----------------------------------#
 # Tournament will return the index of the best candidate
-tournament_with_three <- function(population_size){
+tournament_with_three <- function(population_size,population){
   candidates <- sample(seq(1,population_size,1),3)
-  candidates_fitness <- fitness_pop[candidates]
-  return (candidates[which.max(candidates_fitness)])
+  candidates_fitness <- unlist(lapply(population,fitness))[candidates]
+  return (candidates[which.min(candidates_fitness)])
 }
 
 # ----------------------------------#
@@ -196,8 +196,10 @@ tournament_with_three <- function(population_size){
 roulette <- function(population){
   fitness_pop <- unlist(lapply(population,fitness))
   fitness_pop <- unlist(lapply(fitness_pop, function(x) x + abs(fitness_pop[which.min(fitness_pop)])))
-  roulette <- sum(fitness_pop)
-  probability <- fitness_pop/roulette
+  maximum <- max(fitness_pop)
+  fitness_pop <-abs(fitness_pop - maximum)
+  roulette_sum <- sum(fitness_pop)
+  probability <- fitness_pop/roulette_sum
   return (sample(seq(1,length(population),1),1,prob = probability))
 }
 
@@ -208,7 +210,7 @@ roulette <- function(population){
 ordened_reinsertion <- function(population, childrens,population_size){
   all_population <- append(population,childrens)
   all_fitness <- unlist(lapply(all_population,fitness))
-  best_fitness <- order(all_fitness,decreasing = TRUE)[1:population_size]
+  best_fitness <- order(all_fitness)[1:population_size]
   return (all_population[sample(best_fitness)])
 }
 
@@ -218,12 +220,12 @@ ordened_reinsertion <- function(population, childrens,population_size){
 #Take the [TX_Elitism] (%)  better parents and the [1 - TX_Elitism] better childrens
 elitism_reinsertion <- function(population, childrens,TX_Elitism){
   parents_fitness <- unlist(lapply(population,fitness))
-  best_parents <- order(parents_fitness,decreasing = TRUE)[1:(population_size*TX_Elitism)]
+  best_parents <- order(parents_fitness)[1:(population_size*TX_Elitism)]
   new_parents <- population[sample(best_parents)]
   
   complement_TX <- 1 - TX_Elitism
   childrens_fitness <- unlist(lapply(childrens,fitness))
-  best_childrens <- order(childrens_fitness,decreasing = TRUE)[1:(population_size*complement_TX)]
+  best_childrens <- order(childrens_fitness)[1:(population_size*complement_TX)]
   new_childrens <- childrens[sample(best_childrens)]
   return (c(new_parents,new_childrens))
 }
@@ -235,16 +237,26 @@ elitism_reinsertion <- function(population, childrens,TX_Elitism){
 # ----------------------------------#
 #           PARAMENTERS             #
 # ----------------------------------#
+#Words of the problems
+letters <- c('SEND','MORE','MONEY')
+#letters <- c('EAT','THAT','APPLE')
+#letters <- c('CROSS','ROADS','DANGER')
+#letters <- c('COCA','COLA','OASIS')
+#letters <- c('DONALD','GERALD','ROBERT')
+
 #Set of the characters of the words without repetition 
-words <- 'SENDMORY'
+words <- paste(letters, collapse = '')
+words <- unlist(strsplit(words, ""))
+words <- words[!duplicated(words)]
+words <- paste(words,collapse = '')
+
+#words <- 'SENDMORY'
 #Length of the chromosomes
 individual_size <- nchar(words)
 #Population size 
-population_size <- 50
+population_size <- 100
 #Number of generations
 generation_interactions <- 50
-#Words of the problems
-letters <- c('SEND','MORE','MONEY')
 #Set of characters sorted
 words_sorted = paste(sort(unlist(strsplit(words, ""))), collapse = "")
 #Mutation Rate
@@ -256,74 +268,110 @@ TX_CROSS <- 6 #60%
 #         Genetic Algorithm         #
 # ----------------------------------#
 
-#Step 1 Generate Initial Population
-population <- generate_random_population(population_size)
+Metrics <- list()
 
-#Step 2  - Avaliate Individual Performance
-fitness_population <- unlist(lapply(population,fitness))
-
-best_individual_count <- 0
-best_individual_fitness <- 0
-best_individual_SD <- 0
-best_individual_MEAN <- 0
-best_individual <- rep(0,8)
-for( h in seq(1,generation_interactions,1)){
-
-  #Step 3 - Stop Condition
-  if(best_individual_count > 5) break
-  if(best_individual_fitness == 30 && best_individual_MEAN == 30 && best_individual_SD == 0) break
+for( interactio_num in seq(1,5)){
   
-  childrens <- c()
-  for( x in seq(1,population_size,1)){
-    #step 4 - Select parents 
-    #Tournement
-    #parents = c(tournament_with_three(population_size),tournament_with_three(population_size))
-    #Roulete
-    parents = c(roulette(population),roulette(population))
+  start.time <- Sys.time()
+  #Step 1 Generate Initial Population
+  population <- generate_random_population(population_size)
+  
+  
+  best_individual_count <- 0
+  best_individual_fitness <- 0
+  best_individual_SD <- 0
+  best_individual_MEAN <- 0
+  best_individual <- rep(0,individual_size)
+  for( h in seq(1,generation_interactions,1)){
     
-    #Step 5 - CrossOver
-    #Cyclic
-    children <- cyclic_crossover(population[[parents[1]]],population[[parents[2]]],TX_CROSS)
-    #PMX
-    #children <- pmx(population[[parents[1]]],population[[parents[2]]],TX_CROSS)
-    #Doens't have childrens
-    if(is.null(children)){
-      next
-    }
-    
-    #Step 6 - Mutation
-    children[[1]] = random_mutation(children[[1]],MT)
-    children[[2]] = random_mutation(children[[2]],MT)
-    
-    childrens <- append(childrens,children)
-  }
-
-  
-  #Step 7 - Fitness Children
-  childrens_fitness <- unlist(lapply(childrens, fitness))
-  
-  #Step 8 - Reinsertion
-  #population <- ordened_reinsertion(population,childrens,population_size)
-  population <- elitism_reinsertion(population,childrens,0.2)
-  
-  #METRICS - Save Metrics
-  new_fitness <- unlist(lapply(population,fitness))
-  index_better <- which.max(new_fitness)
-  best_individual_fitness <- new_fitness[index_better]
-  best_individual_SD  <- sd(new_fitness)
-  best_individual_MEAN <- mean(new_fitness)
-  
-  #Basic logs
-  cat('Generation =',h , ' With Fitness =', best_individual_fitness)
-  cat(' Mean=',best_individual_MEAN,' Sd=',best_individual_SD,'\n')
-
-  
-  #Stop Condition By Individual Performance
-  if (sum(best_individual == population[[index_better]]) != 8){
+    #Step 2  - Avaliate Individual Performance
+    new_fitness <- unlist(lapply(population,fitness))
+    index_better <- which.min(new_fitness)
+    best_individual_fitness <- new_fitness[index_better]
+    best_individual_SD  <- sd(new_fitness)
+    best_individual_MEAN <- mean(new_fitness)
     best_individual <- population[[index_better]]
-  }else{
-    best_individual_count = best_individual_count + 1
+    
+    #Step 3 - Stop Condition
+    cat('Generation =',h , ' With Fitness =', best_individual_fitness)
+    cat(' Mean=',best_individual_MEAN,' Sd=',best_individual_SD,'\n')
+    if(best_individual_fitness == 0){
+      Metrics$Generation <- append(h,Metrics$Generation)
+      end.time <- Sys.time()
+      time.taken <- end.time - start.time
+      Metrics$Time <- append(time.taken,Metrics$Time)
+      cat('BEST =',best_individual,'Of Interaction ',interactio_num, '\n')
+      break
+    }
+ 
+    if(best_individual_count > 5) break
+    
+    childrens <- c()
+    for( x in seq(1,population_size,1)){
+      #step 4 - Select parents 
+      #Tournement
+      parents = c(tournament_with_three(population_size,population),tournament_with_three(population_size,population))
+      
+      #Roulete
+      #parents = c(roulette(population),roulette(population))
+      
+      #Step 5 - CrossOver
+      #Cyclic
+      #children <- cyclic_crossover(population[[parents[1]]],population[[parents[2]]],TX_CROSS)
+      
+      #PMX
+      children <- pmx(population[[parents[1]]],population[[parents[2]]],TX_CROSS)
+      
+      #Doens't have childrens
+      if(is.null(children)) next
+      
+      
+      #Step 6 - Mutation
+      children[[1]] = random_mutation(children[[1]],MT)
+      children[[2]] = random_mutation(children[[2]],MT)
+      
+      childrens <- append(childrens,children)
+    }
+  
+    
+    #Step 7 - Fitness Children
+    childrens_fitness <- unlist(lapply(childrens, fitness))
+    
+    #Step 8 - Reinsertion
+    population <- ordened_reinsertion(population,childrens,population_size)
+    #population <- elitism_reinsertion(population,childrens,0.2)
+  
+    
+    #Stop Condition By Individual Performance
+    #if (sum(best_individual == population[[index_better]]) != 10){
+      #best_individual <- population[[index_better]]
+    #}else{
+      #best_individual_count = best_individual_count + 1
+    #}
+    
   }
   
-  cat('BEST =',best_individual,'\n')
+  if(interactio_num == 50){
+    Metrics$Generation <- append(h,Metrics$Generation)
+    end.time <- Sys.time()
+    time.taken <- end.time - start.time
+    Metrics$Time <- append(time.taken,Metrics$Time)
+  }
 }
+
+MinG  <- min(Metrics$Generation)
+MaxG  <- max(Metrics$Generation)
+MeanG <- mean(Metrics$Generation)
+
+MinT  <- min(Metrics$Time)
+MaxT  <- max(Metrics$Time)
+MeanT <- mean(Metrics$Time)
+
+
+MinG
+MaxG
+MeanG
+MinT
+MaxT
+MeanT
+  
